@@ -32,7 +32,7 @@ cudaError_t cudaMemcpyAsyncSanitized(
 
 cudaError_t cudaMemcpySanitized(
     void* dst, void const* src, size_t count, enum cudaMemcpyKind kind, cudaStream_t stream = nullptr);
-    
+
 template <typename T>
 void deviceMalloc(T** ptr, size_t size, bool is_random_initialize = true);
 

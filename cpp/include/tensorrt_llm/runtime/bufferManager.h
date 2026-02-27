@@ -138,7 +138,7 @@ public:
     void offLoadCopy(IBuffer& src, void* dstAddr);
 
     void onBoardCopy(IBuffer& dst, void* srcAddr, int64_t size);
-    
+
     //! \brief Copy `src` to `dst`.
     void copy(void const* src, IBuffer& dst) const
     {

@@ -142,7 +142,7 @@ void KVCacheTransferManager::copyBlock(BlockPtr const& src, BlockPtr const& dst,
                 }
             }
 
-            KVCacheManagerDataSystem& dataSystem = KVCacheManagerDataSystem::getInstance();
+            KvCacheManagerDataSystem& dataSystem = KvCacheManagerDataSystem::getInstance();
             if (!dataSystem.isKVClientInitialized())
             {
                 TLLM_LOG_ERROR("[TensorRT-LLM][Datasystem] KvCache Client is not initialized");
@@ -150,7 +150,7 @@ void KVCacheTransferManager::copyBlock(BlockPtr const& src, BlockPtr const& dst,
             }
             std::shared_ptr<datasystem::KVClient> kvClient = dataSystem.getKVClient();
 
-            KVCacheManagerDataSystemTmp& dataSystem1 = KVCacheManagerDataSystemTmp::getInstance();
+            KvCacheManagerDataSystemTmp& dataSystem1 = KvCacheManagerDataSystemTmp::getInstance();
             if (!dataSystem1.isKVClientInitialized())
             {
                 TLLM_LOG_ERROR("[TensorRT-LLM][Datasystem] KvCache Client TMP is not initialized");

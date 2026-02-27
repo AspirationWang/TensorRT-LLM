@@ -1723,12 +1723,12 @@ size_t KvCacheManagerDataSystem::getKVClientRefCount() const {
     return mkvClientPtr.use_count();
 }
 
-KVCacheManagerDataSystemTmp& KVCacheManagerDataSystemTmp::getInstance() {
-    static KVCacheManagerDataSystemTmp instance; // 首次调用时创建，后续直接返回
+KvCacheManagerDataSystemTmp& KvCacheManagerDataSystemTmp::getInstance() {
+    static KvCacheManagerDataSystemTmp instance; // 首次调用时创建，后续直接返回
     return instance;
 }
 
-KVCacheManagerDataSystemTmp::KVCacheManagerDataSystemTmp()
+KvCacheManagerDataSystemTmp::KvCacheManagerDataSystemTmp()
 {
     datasystem::ConnectOptions conn_opts;
     conn_opts.SetAkSkAuth("", "", "");
@@ -1747,25 +1747,25 @@ KVCacheManagerDataSystemTmp::KVCacheManagerDataSystemTmp()
     TLLM_LOG_INFO("[TensorRT-LLM][Datasystem] Init KvCache Manager DataSystem success.");
 }
 
-KVCacheManagerDataSystemTmp::~KVCacheManagerDataSystemTmp()
+KvCacheManagerDataSystemTmp::~KvCacheManagerDataSystemTmp()
 {
     TLLM_LOG_INFO("[TensorRT-LLM][Datasystem] Delete KvCache Manager DataSystem.");
 }
 
 // 访问接口实现
-std::shared_ptr<datasystem::KVClient> KVCacheManagerDataSystemTmp::getKVClient() {
+std::shared_ptr<datasystem::KVClient> KvCacheManagerDataSystemTmp::getKVClient() {
     return mkvClientPtr;
 }
 
-std::shared_ptr<const datasystem::KVClient> KVCacheManagerDataSystemTmp::getKVClient() const {
+std::shared_ptr<const datasystem::KVClient> KvCacheManagerDataSystemTmp::getKVClient() const {
     return mkvClientPtr;
 }
 
-bool KVCacheManagerDataSystemTmp::isKVClientInitialized() const {
+bool KvCacheManagerDataSystemTmp::isKVClientInitialized() const {
     return mkvClientPtr != nullptr;
 }
 
-size_t KVCacheManagerDataSystemTmp::getKVClientRefCount() const {
+size_t KvCacheManagerDataSystemTmp::getKVClientRefCount() const {
     return mkvClientPtr.use_count();
 }
 
