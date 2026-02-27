@@ -35,6 +35,18 @@ if(ENABLE_NVSHMEM)
                                                        nvshmem::nvshmem_device)
 endif()
 
+# ======================= 新增修改点1：查找datasystem依赖 =======================
+# 查找Datasystem（依赖zmq/tbb/spdlog，由FindDatasystem.cmake处理）
+find_package(DATASYSTEM REQUIRED)
+# ==============================================================================
+
+target_include_directories(
+  ${TRTLLM_PYBIND_MODULE}
+  # =========================== 新增修改点2:添加Datasystem头文件路径 ===========================
+  ${DATASYSTEM_INCLUDE_DIR}/../
+  # ===========================================================================================
+)
+
 target_link_libraries(
   ${TRTLLM_PYBIND_MODULE}
   PUBLIC ${SHARED_TARGET}
@@ -43,7 +55,16 @@ target_link_libraries(
          ${Python3_LIBRARIES}
          ${TORCH_LIBRARIES}
          torch_python
-         ${CUDA_NVML_LIB})
+         ${CUDA_NVML_LIB}
+         DATASYSTEM::datasystem)
+
+get_property(DATASYSTEM_LIB_PATH TARGET DATASYSTEM::datasystem PROPERTY IMPORTED_LOCATION)
+# 2．打印头文件包含路径
+get_property(DATASYSTEM_INC_PATH TARGET DATASYSTEM::datasystem PROPERTY INTERFACE_INCLUDE_DIRECTORIES)
+
+# 3．打印它依赖的其他库（之前的libsecurec.so、tbb等）
+get_property(DATASYSTEM_LINK_LIBS TARGET DATASYSTEM::datasystem PROPERTY INTERFACE_LINK_LIBRARIES)
+
 target_compile_definitions(
   ${TRTLLM_PYBIND_MODULE} PUBLIC TRTLLM_PYBIND_MODULE=${TRTLLM_PYBIND_MODULE}
                                  PYBIND11_DETAILED_ERROR_MESSAGES=1)

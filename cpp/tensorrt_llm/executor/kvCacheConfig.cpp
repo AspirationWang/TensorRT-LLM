@@ -28,9 +28,9 @@ KvCacheConfig::KvCacheConfig(bool enableBlockReuse, std::optional<SizeType32> co
     std::optional<FloatType> const& crossKvCacheFraction, std::optional<RetentionPriority> secondaryOffloadMinPriority,
     size_t eventBufferMaxSize, bool enablePartialReuse, bool copyOnPartialReuse, bool useUvm,
     std::optional<tensorrt_llm::runtime::RuntimeDefaults> const& runtimeDefaults)
-    : mEnableBlockReuse(enableBlockReuse)
-    , mHostCacheSize(hostCacheSize)
-    , mOnboardBlocks(onboardBlocks)
+    : mEnableBlockReuse(true) /* 测试需要，打开前缀缓存共享 */
+    , mHostCacheSize(104857600) /* 测试需要，设置DRAM内存*/
+    , mOnboardBlocks(true) /* 测试需要，打开从DRAM加载kvcache */
     , mSecondaryOffloadMinPriority(secondaryOffloadMinPriority)
     , mEventBufferMaxSize{eventBufferMaxSize}
     , mEnablePartialReuse{enablePartialReuse}

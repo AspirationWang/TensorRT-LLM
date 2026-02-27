@@ -30,6 +30,7 @@
 #include "tensorrt_llm/runtime/modelConfig.h"
 #include "tensorrt_llm/runtime/worldConfig.h"
 #include <NvInferRuntime.h>
+#include <datasystem/kv_client.h>
 
 #include <array>
 #include <cstdint>
@@ -1367,6 +1368,56 @@ public:
     [[nodiscard]] virtual SizeType32 getMaxCapacityBatchSize(SizeType32 inputLength, SizeType32 outputLength) const = 0;
 
     [[nodiscard]] virtual CacheType getCacheType() const = 0;
+};
+
+class KvCacheManagerDataSystem{
+private:
+    //核心成员：共享智能指针管理 kvclient 
+    std::shared_ptr< datasystem::KVClient->mkvClientPtr;
+    // =====单例核心：私有化构造/拷贝/赋值=====
+    // 无参构造函数（复杂实现放.cpp，仅声明）
+    KvCacheManagerDataSystem();
+    //禁用拷贝构造和赋值（单例禁止多实例）
+    KvCacheManagerDataSystem(const KvCacheManagerDataSystem&) = delete;
+     KvCacheManagerDataSystem &operator = (const KvCacheManagerDataSystem&) = delete;
+    //禁用移动构造和赋值（可选，强化单例特性）
+    KvCacheManagerDataSystem(KvCacheManagerDataSystem&&) = delete;
+    KvCacheManagerDataSystem &operator = (KvCacheManagerDataSystem&&) = delete;
+public:
+    // =====单例核心：全局唯一访问入口=====
+    static KvCacheManagerDataSystem &getInstance();
+    // =====单例核心：外部访问接口=====
+    std::shared_ptr <datasystem::KVClient> getKVClient();
+    std::shared_ptr <const datasystem::KVClient> getKVClient() const;
+    bool isKVClientInitialized() const;
+    size_t getKVClientRefCount() const ;
+    // 析构函数（声明，复杂清理放.cpp)
+    ~KvCacheManagerDataSystem();
+};
+
+class KvCacheManagerDataSystemTmp{
+private :
+    //核心成员：共享智能指针管理 KvClient 
+    std::shared_ptr <datasystem::KVClient> mkvClientPtr;
+    // =====单例核心：私有化构造/拷贝/赋值=====
+    // 无参构造函数（复杂实现放.cpp，仅声明）
+    KvCacheManagerDataSystemTmp();
+    // 禁用拷贝构造和赋值（单例禁止多实例）
+    KvCacheManagerDataSystemTmp(const KvCacheManagerDataSystemTmp &) = delete;
+    KvCacheManagerDataSystemTmp &operator = (const KvCacheManagerDataSystemTmp&) = delete;
+    // 禁用移动构造和赋值（可选，强化单例特性）
+    KvCacheManagerDataSystemTmp (KvCacheManagerDataSystemTmp &&)= delete ;
+    KvCacheManagerDataSystemTmp & operator = (KvCacheManagerDataSystemTmp &&)- delete ;
+public :
+    // =====单例核心：全局唯一访问入口=====
+     static KvCacheManagerDataSystemTmp & getInstance();
+    // =====单例核心：外部访问接口=====
+    std::shared_ptr <datasystem::KVClient> getKVClient();
+    std::shared_ptr <datasystem::KVClient> getKVClient() const;
+    bool isKVClientInitialized() const;
+    size_t getKVClientRefCount() const;
+    // 析构函数（声明，复杂清理放.cpp)
+    ~KVCacheManagerDataSystemTmp();
 };
 
 class KVCacheManager : public BaseKVCacheManager

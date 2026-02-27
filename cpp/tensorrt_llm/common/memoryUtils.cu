@@ -86,6 +86,50 @@ cudaError_t cudaMemcpyAsyncSanitized(
 #endif
 }
 
+cudaError_t cudaMemcpySanitized(
+    void* dst, void const* src, size_t count, enum cudaMemcpyKind kind, cudaStream_t stream = nullptr)
+{
+    #if defined(TLLM_HAS_ASAN)
+    bool needASAN = false;
+    if (kind == cudaMemcpyDeviceToHost)
+    {
+        needASAN = true;
+    }
+    else if (kind == cudaMemcpyDefault)
+    {
+        auto const srcType = getPtrCudaMemoryType(src);
+        auto const dstType = getPtrCudaMemoryType(dst);
+        needASAN = srcType == cudaMemoryTypeDevice && dstType != cudaMemoryTypeDevice;
+    }
+
+    // Poison the memory area during async copy
+    if (needASAN)
+    {
+        ASAN_POISON_MEMORY_REGION(dst, count);
+    }
+    auto const result = cudaMemcpy(dst, src, count, kind);
+    if (result == cudaSuccess && needASAN)
+    {
+        struct ctxType
+        {
+            void* ptr;
+            size_t count;
+        };
+        auto const ctx = new ctxType{dst, count};
+        auto cb = [](cudaStream_t, cudaError_t, void* data)
+        {
+            auto const ctx = static_cast<ctxType*>(data);
+            ASAN_UNPOISON_MEMORY_REGION(ctx->ptr, ctx->count);
+            delete ctx;
+        };
+        TLLM_CUDA_CHECK(cudaStreamAddCallback(stream, cb, ctx, 0));
+    }
+
+    return result;
+#else
+    return cudaMemcpyAsync(dst, src, count, kind);
+}
+
 template <typename T>
 void deviceMalloc(T** ptr, size_t size, bool is_random_initialize)
 {

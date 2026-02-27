@@ -392,6 +392,24 @@ void KVCacheBlock::addNextBlock(BlockKey const& blockKey, BlockPtr block)
     }
 }
 
+bool checkKeyExist(const std::string& key)
+{
+    KvCacheManagerDataSystem& dataSystem = KvCacheManagerDataSystem::getInstance();
+    if (!dataSystem.isKVClientInitialized()) {
+		TLLM_LOG_ERROR("[TensorRT-LLM ][Datasystem] KvCache Client is not initialized ");
+		return false;
+	}
+    std::shared_ptr <datasystem::KVClient> kvClient->dataSystem.getKVClient();
+    std::vector<std::string> keys = { key };
+    std::vector<bool> exists;
+    datasystem::Status existRet = kvClient->Exist(keys, exists);
+    if(existRet.IsError()) {
+		TLLM_LOG_ERROR("[TensorRT-LLM][Datasystem] Exist KvCache failed, detail:%s.", existRet.ToString().c_str());
+		return false;
+	}
+    return !exists.empty() && exists[0];
+}
+
 std::tuple<bool, SizeType32, BlockPtr> KVCacheBlock::findMatchingBlock(
     BlockKey const& blockKey, bool enablePartialReuse, bool copyOnPartialReuse) const
 {
@@ -420,12 +438,20 @@ std::tuple<bool, SizeType32, BlockPtr> KVCacheBlock::findMatchingBlock(
             }
             if (bestNumMatched > 0)
             {
+                if (!bestBlock->isPrimary() && !checkKeyExist(std::to_string(BlockKeyHasher::hash(bestBlock->getBlockKey())))) {
+                    /* 如果kvcache已经被卸载到DRAM中，需要先检查在datasystem中还存不存在，如果不存在，需要重新计算 */
+                    return {false, 0, nullptr};
+                }
                 return {true, bestNumMatched, bestBlock};
             }
         }
         return {false, 0, nullptr};
     }
     auto block = itr->second;
+    if (!block->isPrimary() && !checkKeyExist(std::to_string(BlockKeyHasher::hash(bestBlock->getBlockKey())))) {
+        /* 如果kvcache已经被卸载到DRAM中，需要先检查在datasystem中还存不存在，如果不存在，需要重新计算 */
+        return {false, 0, nullptr};
+    }
     return {!block->isFull(), static_cast<SizeType32>(blockKey.uniqueTokens.size()), block};
 }
 
@@ -768,7 +794,10 @@ void WindowBlockManager::allocatePools(bool useUvm)
                 = ITensor::makeShape({mNumSecondaryBlocks, pool.numLayers, mKVFactor, blockSize});
             TLLM_LOG_DEBUG("[%s] Allocating secondary pool with %d blocks for %d layers with %d kv heads",
                 mLogPrefix.c_str(), mNumSecondaryBlocks, pool.numLayers, pool.numKvHeads);
+            /*
+            申请DRAM流程删除
             pool.secondaryPtr = BufferManager::pinned(cacheShapeOffload, poolDtype);
+            */
         }
     }
 }
@@ -789,10 +818,13 @@ void WindowBlockManager::releasePools()
         {
             pool.primaryPtr->release();
         }
+        /*
+        释放DRAM流程删除
         if (pool.secondaryPtr)
         {
             pool.secondaryPtr->release();
         }
+        */
     }
     mBufferManager.getStream().synchronize();
     mBufferManager.memoryPoolTrimTo(0);
@@ -1645,6 +1677,98 @@ void WindowBlockManager::schedulingReleaseBlocks(RequestIdType requestId)
     }
 }
 
+KvCacheManagerDataSystem& KvCacheManagerDataSystem::getInstance() {
+    static KvCacheManagerDataSystem instance; // 首次调用时创建，后续直接返回
+    return instance;
+}
+
+KvCacheManagerDataSystem::KvCacheManagerDataSystem()
+{
+    datasystem::ConnectOptions conn_opts;
+    conn_opts.SetAkSkAuth("", "", "");
+    // 核心：集群地址（优先从环境变量读取，便于部署）
+    conn_opts.host = std::getenv("DATASYSTEM_HOST") ? std::getenv("DATASYSTEM_HOST") : "127.0.0.1";
+    conn_opts.port = std::getenv("DATASYSTEM_PORT") ? std::stoi(std::getenv("DATASYSTEM_PORT")) : 31501;
+    TLLM_LOG_INFO("[TensorRT-LLM][Datasystem] Init KvCache Manager DataSystem. host = %s, ip = %u.", conn_opts.host.c_str(), conn_opts.port);
+    // 超时配置
+    conn_opts.connectTimeoutMs = 60000; // 保留默认60s
+    conn_opts.requestTimeoutMs = 10000; // 单次请求10s超时
+    // 连接模式（单节点本地DRAM加载）
+    conn_opts.enableCrossNodeConnection = false; // 单节点
+    conn_opts.enableExclusiveConnection = false; // 复用连接池
+    conn_opts.enableRemoteH2D = false; // 本地DRAM
+    mkvClientPtr = std::make_shared<datasystem::KVClient>(conn_opts);
+    TLLM_LOG_INFO("[TensorRT-LLM][Datasystem] Init KvCache Manager DataSystem success.");
+}
+
+KvCacheManagerDataSystem::~KvCacheManagerDataSystem()
+{
+    TLLM_LOG_INFO("[TensorRT-LLM][Datasystem] Delete KvCache Manager DataSystem.");
+}
+
+// 访问接口实现
+std::shared_ptr<datasystem::KVClient> KvCacheManagerDataSystem::getKVClient() {
+    return mkvClientPtr;
+}
+
+std::shared_ptr<const datasystem::KVClient> KvCacheManagerDataSystem::getKVClient() const {
+    return mkvClientPtr;
+}
+
+bool KvCacheManagerDataSystem::isKVClientInitialized() const {
+    return mkvClientPtr != nullptr;
+}
+
+size_t KvCacheManagerDataSystem::getKVClientRefCount() const {
+    return mkvClientPtr.use_count();
+}
+
+KVCacheManagerDataSystemTmp& KVCacheManagerDataSystemTmp::getInstance() {
+    static KVCacheManagerDataSystemTmp instance; // 首次调用时创建，后续直接返回
+    return instance;
+}
+
+KVCacheManagerDataSystemTmp::KVCacheManagerDataSystemTmp()
+{
+    datasystem::ConnectOptions conn_opts;
+    conn_opts.SetAkSkAuth("", "", "");
+    // 核心：集群地址（优先从环境变量读取，便于部署）
+    conn_opts.host = std::getenv("DATASYSTEM_HOST") ? std::getenv("DATASYSTEM_HOST") : "127.0.0.1";
+    conn_opts.port = std::getenv("DATASYSTEM_PORT") ? std::stoi(std::getenv("DATASYSTEM_PORT")) : 31501;
+    TLLM_LOG_INFO("[TensorRT-LLM][Datasystem] Init KvCache Manager DataSystem. host = %s, ip = %u.", conn_opts.host.c_str(), conn_opts.port);
+    // 超时配置
+    conn_opts.connectTimeoutMs = 60000; // 保留默认60s
+    conn_opts.requestTimeoutMs = 10000; // 单次请求10s超时
+    // 连接模式（单节点本地DRAM加载）
+    conn_opts.enableCrossNodeConnection = false; // 单节点
+    conn_opts.enableExclusiveConnection = false; // 复用连接池
+    conn_opts.enableRemoteH2D = false; // 本地DRAM
+    mkvClientPtr = std::make_shared<datasystem::KVClient>(conn_opts);
+    TLLM_LOG_INFO("[TensorRT-LLM][Datasystem] Init KvCache Manager DataSystem success.");
+}
+
+KVCacheManagerDataSystemTmp::~KVCacheManagerDataSystemTmp()
+{
+    TLLM_LOG_INFO("[TensorRT-LLM][Datasystem] Delete KvCache Manager DataSystem.");
+}
+
+// 访问接口实现
+std::shared_ptr<datasystem::KVClient> KVCacheManagerDataSystemTmp::getKVClient() {
+    return mkvClientPtr;
+}
+
+std::shared_ptr<const datasystem::KVClient> KVCacheManagerDataSystemTmp::getKVClient() const {
+    return mkvClientPtr;
+}
+
+bool KVCacheManagerDataSystemTmp::isKVClientInitialized() const {
+    return mkvClientPtr != nullptr;
+}
+
+size_t KVCacheManagerDataSystemTmp::getKVClientRefCount() const {
+    return mkvClientPtr.use_count();
+}
+
 KVCacheManager::KVCacheManager(SizeType32 numLayers, SizeType32 numKvHeads, SizeType32 sizePerHead,
     SizeType32 tokensPerBlock, BlocksPerWindow const& blocksPerWindow, SizeType32 maxNumSequences,
     SizeType32 maxBeamWidth, std::vector<SizeType32> const& maxAttentionWindowVec,
@@ -1707,6 +1831,25 @@ KVCacheManager::KVCacheManager(std::vector<SizeType32> const& numKvHeadsPerLayer
     TLLM_CHECK(mSinkBlockTokenLength % tokensPerBlock == 0);
     TLLM_LOG_DEBUG("KV cache block reuse is %s", mEnableBlockReuse ? "enabled" : "disabled");
     mSequences.reserve(maxNumSequences);
+
+    /* 创建dataSystem的单例类 */
+    TLLM_LOG_INFO("[TensorRT-LLM][Datasystem] Create Datasystem class");
+
+    KvCacheManagerDataSystem& dataSystem = KvCacheManagerDataSystem::getInstance();
+    std::shared_ptr<datasystem::KVClient> kvClient = dataSystem.getKVClient();
+    datasystem::Status initRet = kvClient->Init();
+    if (initRet.IsError()) {
+        TLLM_LOG_ERROR("[TensorRT-LLM][Datasystem] Init KvCache failed, detail : %s", initRet.ToString().c_str());
+        return;
+    }
+
+    KvCacheManagerDataSystemTmp& dataSystem1 = KvCacheManagerDataSystemTmp::getInstance();
+    std::shared_ptr<datasystem::KVClient> kvClient1 = dataSystem1.getKVClient();
+    datasystem::Status initRet1 = kvClient1->Init();
+    if (initRet1.IsError()) {
+        TLLM_LOG_ERROR("[TensorRT-LLM][Datasystem] Init KvCache Tmp failed, detail : %s", initRet.ToString().c_str());
+        return;
+    }
 }
 
 KVCacheManager::KVCacheManager(SizeType32 numLayers, SizeType32 numKvHeads, SizeType32 sizePerHead,

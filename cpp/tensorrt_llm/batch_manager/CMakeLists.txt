@@ -77,12 +77,21 @@ else() # Windows
   set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} /W4")
 endif()
 
+# ======================= 新增修改点1：查找datasystem依赖 =======================
+# 查找Datasystem（依赖zmq/tbb/spdlog，由FindDatasystem.cmake处理）
+find_package(DATASYSTEM REQUIRED)
+# ==============================================================================
+
 add_library(${BATCH_MANAGER_STATIC_TARGET} STATIC ${SRCS})
 target_include_directories(
   ${BATCH_MANAGER_STATIC_TARGET}
   PUBLIC ${3RDPARTY_DIR}/xgrammar/3rdparty/picojson
          ${3RDPARTY_DIR}/xgrammar/3rdparty/dlpack/include
-         ${3RDPARTY_DIR}/xgrammar/include)
+         ${3RDPARTY_DIR}/xgrammar/include
+         # =========================== 新增修改点2:添加Datasystem头文件路径 ===========================
+         ${DATASYSTEM_INCLUDE_DIR}/../
+         # ===========================================================================================
+)
 
 set_target_properties(
   ${BATCH_MANAGER_STATIC_TARGET}
@@ -108,3 +117,17 @@ if(ENABLE_UCX)
   target_link_libraries(${BATCH_MANAGER_STATIC_TARGET} PUBLIC)
 
 endif()
+
+# ========================== 新增修改点3：链接DataSystem/库 ==========================
+# 链接DataSystem核心库（自动包含zmq/tbb/spdlog依赖）
+target_link_libraries(${BATCH_MANAGER_STATIC_TARGET}
+  PUBLIC
+    DATASYSTEM::datasystem # DataSystem导入目标（包含所有依赖）
+)
+get_property(DATASYSTEM_LIB_PATH TARGET DATASYSTEM::datasystem PROPERTY IMPORTED_LOCATION)
+# 2．打印头文件包含路径
+get_property(DATASYSTEM_INC_PATH TARGET DATASYSTEM::datasystem PROPERTY INTERFACE_INCLUDE_DIRECTORIES)
+
+# 3．打印它依赖的其他库（之前的libsecurec.so、tbb等）
+get_property(DATASYSTEM_LINK_LIBS TARGET DATASYSTEM::datasystem PROPERTY INTERFACE_LINK_LIBRARIES)
+# ===================================================================================

@@ -39,6 +39,7 @@
 #include <cstring>
 #include <string>
 #include <vector>
+#include <time.h>
 
 namespace tr = tensorrt_llm::runtime;
 namespace tk = tensorrt_llm::kernels;
@@ -99,6 +100,10 @@ tr::ITensor::SharedPtr KVCacheTransferManager::computeBlockPointer(
     TLLM_CHECK_WITH_INFO(!pools.empty(), "Pool index %lu is out of bounds", poolIdx);
     auto const& pool = pools.at(poolIdx);
     auto ptr = block->isPrimary() ? pool.primaryPtr : pool.secondaryPtr;
+    if (ptr == nullptr) {
+        /* 开启datasystem后，获取到的指针可能为空指针，如果不返回，下方会访问空指针报错 */
+        return nullptr;
+    }
     auto const blockOffset = block->getMemoryPoolBlockIndex();
     tr::ITensor::SharedPtr blockTensor{tr::ITensor::slice(ptr, blockOffset, 1)};
     return blockTensor;
@@ -111,52 +116,99 @@ void KVCacheTransferManager::copyBlock(BlockPtr const& src, BlockPtr const& dst,
     TLLM_LOG_DEBUG("copyBlock entered: srcId=%d, dstId=%d, isOffload=%s, mode=%d", src->getBlockId(), dst->getBlockId(),
         (isOffload ? "true" : "false"), static_cast<int>(mode));
 
-    if (mode == executor::KvCacheTransferMode::DRAM)
+    if (mode == executor::KVCacheTransferMode::DRAM)
     {
+        TLLM_LOG_DEBUG("[TensorRT-LLM][Datasystem] mode = %d: pools.size() = %u, numTokensToCopy = %d.",
+            pools.size(), numTokensToCopy);
+        TLLM_LOG_DEBUG("[TensorRT-LLM][Datasystem] Src Key = %s.", std::to_string(BlockKeyHasher::hash(src->getBlockKey())).c_str());
+        TLLM_LOG_DEBUG("[TensorRT-LLM][Datasystem] Dst Key = %s.", std::to_string(BlockKeyHasher::hash(dst->getBlockKey())).c_str());
         TLLM_LOG_DEBUG("Using DRAM-based copy (GPU <-> CPU) for this block.");
-
         // Iterate over all pools, partial-copy logic
         for (size_t poolIdx = 0; poolIdx < pools.size(); ++poolIdx)
         {
             auto srcPtr = computeBlockPointer(src, pools, poolIdx);
             auto dstPtr = computeBlockPointer(dst, pools, poolIdx);
+            if (srcPtr == nullptr) {
+                if (dstPtr == nullptr) {
+                    TLLM_LOG_DEBUG("[TensorRT-LLM][Datasystem] srcPtr is empty ptr, dstPtr is empty ptr");
+                } else {
+                    TLLM_LOG_DEBUG("[TensorRT-LLM][Datasystem] srcPtr is empty ptr, dstPtr is not empty ptr");
+                }
+            } else {
+                if (dstPtr == nullptr) {
+                    TLLM_LOG_DEBUG("[TensorRT-LLM][Datasystem] srcPtr is not empty ptr, dstPtr is empty ptr");
+                } else {
+                    TLLM_LOG_DEBUG("[TensorRT-LLM][Datasystem] srcPtr is not empty ptr, dstPtr is not empty ptr");
+                }
+            }
+
+            KVCacheManagerDataSystem& dataSystem = KVCacheManagerDataSystem::getInstance();
+            if (!dataSystem.isKVClientInitialized())
+            {
+                TLLM_LOG_ERROR("[TensorRT-LLM][Datasystem] KvCache Client is not initialized");
+                return;
+            }
+            std::shared_ptr<datasystem::KVClient> kvClient = dataSystem.getKVClient();
+
+            KVCacheManagerDataSystemTmp& dataSystem1 = KVCacheManagerDataSystemTmp::getInstance();
+            if (!dataSystem1.isKVClientInitialized())
+            {
+                TLLM_LOG_ERROR("[TensorRT-LLM][Datasystem] KvCache Client TMP is not initialized");
+                return;
+            }
+            std::shared_ptr<datasystem::KVClient> kvClient1 = dataSystem1.getKVClient();
 
             // If no partial tokens or if the dataType is not supported for partial copy, copy entire block.
-            if (numTokensToCopy <= 0 || srcPtr->getDataType() == nvinfer1::DataType::kINT4
-                || srcPtr->getDataType() == nvinfer1::DataType::kFP4)
-            {
-                // For partial copy not implemented with these data types,
-                // just do a full copy.
-                (isOffload ? mOffloadManager : mOnboardManager).copy(*srcPtr, *dstPtr);
-            }
-            else
-            {
-                int const tokensPerBlock = pools[poolIdx].tokensPerBlock;
-                if (numTokensToCopy >= tokensPerBlock)
-                {
-                    // If requested tokens >= entire block, just do a full copy.
-                    (isOffload ? mOffloadManager : mOnboardManager).copy(*srcPtr, *dstPtr);
+            if (isOffload) {
+                /* 先create再set */
+                std::shared_ptr<datasystem::Buffer> buffer;
+                datasystem::SetParam para;
+                para.writeMode = datasystem::WriteMode::NONE_L2_CACHE_EVICT;
+                datasystem::Status createRet = kvClient->Create(std::to_string(BlockKeyHasher::hash(src->getBlockKey())), srcPtr->getSizeInBytes(), para, buffer);
+                TLLM_LOG_DEBUG("[TensorRT-LLM][Datasystem] Create Key = %s.", std::to_string(BlockKeyHasher::hash(src->getBlockKey())).c_str());
+                if (createRet.IsError()) {
+                    TLLM_LOG_ERROR("[TensorRT-LLM][Datasystem] Create KvCache failed, detail : %s", createRet.ToString().c_str());
+                    return;
                 }
-                else
-                {
-                    auto stream = (isOffload ? mOffloadManager : mOnboardManager).getStream().get();
-                    int const numLayers = pools[poolIdx].numLayers;
-                    int const kvFactor = pools[poolIdx].kvFactor;
-                    int const numHeads = pools[poolIdx].numKvHeads;
-                    int const sizePerHead = pools[poolIdx].sizePerHead;
-                    auto shape = srcPtr->getShape();
-
-                    TLLM_CHECK_WITH_INFO(
-                        shape.nbDims == 4, "Expected KVCache block to have 4 dims, got %d", shape.nbDims);
-
-                    tk::kvCacheBlockPartialCopy(*dstPtr, *srcPtr, numLayers, numHeads, tokensPerBlock, sizePerHead,
-                        numTokensToCopy, kvFactor, stream);
+            
+                mOffloadManager.offloadCopy(*srcPtr, buffer->MutableData());
+                /* set的地址为buffer */
+                buffer->MLatch();
+                datasystem::Status setRet = kvClient->Set(buffer);
+                buffer->MUnlatch();
+                if (setRet.IsError()) {
+                    TLLM_LOG_ERROR("[TensorRT-LLM][Datasystem] Set KvCache failed, detail : %s", setRet.ToString().c_str());
+                    return;
+                }
+                TLLM_LOG_DEBUG("[TensorRT-LLM][Datasystem] Set Key = %s success.", std::to_string(BlockKeyHasher::hash(src->getBlockKey())).c_str());
+            } else {
+                /* 如果在HBM中，则直接使用，不需要查datasystem */
+                if (src->isPrimary()) {
+                    TLLM_LOG_DEBUG("[TensorRT-LLM][Datasystem] Kvcache in HBM, Key = %s.", std::to_string(BlockKeyHasher::hash(src->getBlockKey())).c_str());
+                    mOnboardManager.copy(*srcPtr, *dstPtr);
+                } else {
+                    /* 如果不在HBM中，前面已经判断了datasystem中有数据，直接get完成后通过cuda接口加载到HBM中 */
+                    // struct timespec start, end;
+                    // clock_gettime(CLOCK_MONOTONIC, &start);
+                    datasystem::Optional<datasystem::Buffer> buffer;
+                    datasystem::Status getRet = kvClient1->Get(std::to_string(BlockKeyHasher::hash(src->getBlockKey())), buffer, 0);
+                    TLLM_LOG_INFO("[TensorRT-LLM][Datasystem] Get Key = %s.", std::to_string(BlockKeyHasher::hash(src->getBlockKey())).c_str());
+                    if (getRet.IsError()) {
+                        TLLM_LOG_ERROR("[TensorRT-LLM][Datasystem] Get KvCache failed, detail : %s", getRet.ToString().c_str());
+                        return;
+                    }
+            
+                    TLLM_LOG_DEBUG("[TensorRT-LLM][Datasystem] Get KvCache Success");
+                    buffer->RLatch();
+                    mOnboardManager.onBoardCopy(*dstPtr, buffer->MutableData(), buffer->GetSize());
+                    buffer->RUnlatch();
+                    // clock_gettime(CLOCK_MONOTONIC, &end);
+                    // long long duration_ns = (end.tv_sec - start.tv_sec) * 1e9 + (end.tv_nsec - start.tv_nsec);
+                    // double duration_ms = duration_ns / 1e6;
+                    // TLLM_LOG_INFO("[TensorRT-LLM][Datasystem] Get Key time = %lf.", duration_ms);
                 }
             }
         }
-
-        TLLM_LOG_DEBUG("copyBlock: DRAM mode complete. Returning...");
-        return;
     }
 
     for (size_t poolIdx = 0; poolIdx < pools.size(); ++poolIdx)
