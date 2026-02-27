@@ -397,7 +397,7 @@ bool checkKeyExist(const std::string& key)
     KvCacheManagerDataSystem& dataSystem = KvCacheManagerDataSystem::getInstance();
     if (!dataSystem.isKVClientInitialized())
     {
-		TLLM_LOG_ERROR("[TensorRT-LLM ][Datasystem] KvCache Client is not initialized ");
+		TLLM_LOG_ERROR("[TensorRT-LLM ][Datasystem] KvCache Client is not initialized");
 		return false;
 	}
     std::shared_ptr <datasystem::KVClient> kvClient = dataSystem.getKVClient();
@@ -405,7 +405,7 @@ bool checkKeyExist(const std::string& key)
     std::vector<bool> exists;
     datasystem::Status existRet = kvClient->Exist(keys, exists);
     if(existRet.IsError()) {
-		TLLM_LOG_ERROR("[TensorRT-LLM][Datasystem] Exist KvCache failed, detail:%s.", existRet.ToString().c_str());
+		TLLM_LOG_ERROR("[TensorRT-LLM][Datasystem] Exist KvCache failed, detail : %s.", existRet.ToString().c_str());
 		return false;
 	}
     return !exists.empty() && exists[0];
@@ -440,7 +440,7 @@ std::tuple<bool, SizeType32, BlockPtr> KVCacheBlock::findMatchingBlock(
             }
             if (bestNumMatched > 0)
             {
-                if (!bestBlock->isPrimary() && !CheckKeyExist(std::to_string(BlockKeyHasher::hash(bestBlock->getBlockKey())))) {
+                if (!bestBlock->isPrimary() && !checkKeyExist(std::to_string(BlockKeyHasher::hash(bestBlock->getBlockKey())))) {
                     TLLM_LOG_INFO("[TensorRT-LLM][Datasystem] Exist Key = %s.", std::to_string(BlockKeyHasher::hash(block->getBlockKey())).c_str());
                     /* 如果kvcache已经被卸载到DRAM中，需要先检查在datasystem中还存不存在，如果不存在，需要重新计算 */
                     return {false, 0, nullptr};
@@ -1739,7 +1739,7 @@ KvCacheManagerDataSystemTmp::KvCacheManagerDataSystemTmp()
     // 核心：集群地址（优先从环境变量读取，便于部署）
     conn_opts.host = std::getenv("DATASYSTEM_HOST") ? std::getenv("DATASYSTEM_HOST") : "127.0.0.2";
     conn_opts.port = std::getenv("DATASYSTEM_PORT") ? std::stoi(std::getenv("DATASYSTEM_PORT")) : 31501;
-    TLLM_LOG_INFO("[TensorRT-LLM][Datasystem] Init KvCache Manager DataSystem TMP. host = %s, ip = %u.", conn_opts.host.c_str(), conn_opts.port);
+    TLLM_LOG_INFO("[TensorRT-LLM][Datasystem] Init KvCache TMP Manager DataSystem. host = %s, ip = %u.", conn_opts.host.c_str(), conn_opts.port);
     // 超时配置
     conn_opts.connectTimeoutMs = 60000; // 保留默认60s
     conn_opts.requestTimeoutMs = 10000; // 单次请求10s超时

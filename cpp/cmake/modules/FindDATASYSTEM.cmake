@@ -92,16 +92,16 @@ if(SPDLOG_STATIC_LIBRARY)
   set (DATASYSTEM_LIBRARIES ${DATASYSTEM_LIBRARIES} ${SPDLOG_STATIC_LIBRARY})
 endif()
 
-# 查找 spdlog 头文件路径
-find_path(SPOLCG_INCLUDE_DIR NAMES spdlog/spdlog.h)
+# 查找spdlog 头文件路径
+find_path(SPDLOG_INCLUDE_DIR NAMES spdlog/spdlog.h)
 
 # ================================= 验证查找结果 ================================= #
 include(FindPackageHandleStandardArgs)
 find_package_handle_standard_args(
   DATASYSTEM 
-  FOUND_VAR_DATASYSTEM_FOUND 
+  FOUND_VAR DATASYSTEM_FOUND 
   REQUIRED_VARS DATASYSTEM_LIBRARIES DATASYSTEM_INCLUDE_DIR ZMQ_INCLUDE_DIR TBB_INCLUDE_DIR SPDLOG_INCLUDE_DIR 
-  VERSION_VAR DATASYSTEM VERSION_STRING)
+  VERSION_VAR DATASYSTEM_VERSION_STRING)
 # ================================= 创建导入目标 ================================= #
 # 1.DataSystem动态库导入目标
 if(DATASYSTEM_LIBRARY)
@@ -127,4 +127,4 @@ if(DATASYSTEM_STATIC_LIBRARY)
     "${SPDLOG_INCLUDE_DIR}")
   set_property(TARGET DATASYSTEM::datasystem_static PROPERTY IMPORTED_LOCATION "${DATASYSTEM_STATIC_LIBRARY}")
   target_link_libraries(DATASYSTEM::datasystem_static INTERFACE ${ZMQ_STATIC_LIBRARY} ${TBB_STATIC_LIBRARY} ${SPDLOG_STATIC_LIBRARY})
-endif
+endif()

@@ -81,8 +81,7 @@ find_package(DATASYSTEM REQUIRED)
 add_library(${EXECUTOR_STATIC_TARGET} STATIC ${SRCS})
 target_include_directories(
   ${EXECUTOR_STATIC_TARGET}
-  PUBLIC ${DATASYSTEM_INCLUDE_DIR}/../
-)
+  PUBLIC ${DATASYSTEM_INCLUDE_DIR}/../)
 set_target_properties(
   ${EXECUTOR_STATIC_TARGET}
   PROPERTIES CXX_STANDARD "17" CXX_STANDARD_REQUIRED "YES" CXX_EXTENSIONS "NO"
@@ -99,7 +98,7 @@ add_subdirectory(cache_transmission/nixl_utils)
 
 # ========================== 新增修改点3：链接DataSystem/库 ==========================
 # 链接DataSystem核心库（自动包含zmq/tbb/spdlog依赖）
-target_link_libraries(${BATCH_MANAGER_STATIC_TARGET}
+target_link_libraries(${EXECUTOR_STATIC_TARGET}
   PUBLIC
     DATASYSTEM::datasystem # DataSystem导入目标（包含所有依赖）
 )

@@ -43,7 +43,7 @@ find_package(DATASYSTEM REQUIRED)
 target_include_directories(
   ${TRTLLM_PYBIND_MODULE}
   # =========================== 新增修改点2:添加Datasystem头文件路径 ===========================
-  ${DATASYSTEM_INCLUDE_DIR}/../
+  PUBLIC ${DATASYSTEM_INCLUDE_DIR}/../
   # ===========================================================================================
 )
 
@@ -56,7 +56,8 @@ target_link_libraries(
          ${TORCH_LIBRARIES}
          torch_python
          ${CUDA_NVML_LIB}
-         DATASYSTEM::datasystem)
+         DATASYSTEM::datasystem # DataSystem导入目标（包含所有依赖）
+)
 
 get_property(DATASYSTEM_LIB_PATH TARGET DATASYSTEM::datasystem PROPERTY IMPORTED_LOCATION)
 # 2．打印头文件包含路径

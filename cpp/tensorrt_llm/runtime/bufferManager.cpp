@@ -145,24 +145,6 @@ void BufferManager::setMem(IBuffer& buffer, int32_t value) const
     }
 }
 
-void BufferManager::offLoadCopy(IBuffer& src, void* dstAddr)
-{
-    TLLM_LOG_DEBUG("[TensorRT-LLM][Datasystem] OffLoad copy, size = %lld.", src.getSizeInBytes());
-    if (src.getSizeInBytes() > 0) {
-        TLLM_LOG_DEBUG("[TensorRT-LLM][Datasystem] Print ptr address , src = %p , dst = %p .", src.data(), dstAddr);
-        TLLM_CUDA_CHECK(tensorrt_llm::common::cudaMencpySanitized(dstAddr, src.data(), src.getSizeInBytes(), cudaMemcpyDeviceToHost, mStream->get()));
-    }
-}
-
-void BufferManager::onBoardCopy(IBuffer& dst, void* srcAddr, int64_t size)
-{
-    TLLM_LOG_DEBUG ("[TensorRT-LLM][Datasystem] OnBoard copy, size=%lld.", size);
-    if (dst.getSizeInBytes() > 0) {
-        TLLM_LOG_DEBUG("[TensorRT_LLM][Datasystem] Print ptr address , src = %p , dst =%p.", srcAddr, dst.data());
-        TLLM_CUDA_CHECK(tensorrt_llm::common::cudaMencpySanitized(dst.data(), srcAddr, size, cudaMemcpyHostToDevice ,Stream->get()));
-    }
-}
-
 void BufferManager::copy(void const* src, IBuffer& dst, MemoryType srcType) const
 {
     if (dst.getSizeInBytes() > 0)
@@ -194,6 +176,25 @@ void BufferManager::copy(IBuffer const& src, void* dst, MemoryType dstType) cons
         }
     }
 }
+
+void BufferManager::offLoadCopy(IBuffer& src, void* dstAddr)
+{
+    TLLM_LOG_DEBUG("[TensorRT-LLM][Datasystem] OffLoad copy, size = %lld.", src.getSizeInBytes());
+    if (src.getSizeInBytes() > 0) {
+        TLLM_LOG_DEBUG("[TensorRT-LLM][Datasystem] Print ptr address , src = %p , dst = %p .", src.data(), dstAddr);
+        TLLM_CUDA_CHECK(tensorrt_llm::common::cudaMemcpySanitized(dstAddr, src.data(), src.getSizeInBytes(), cudaMemcpyDeviceToHost, mStream->get()));
+    }
+}
+
+void BufferManager::onBoardCopy(IBuffer& dst, void* srcAddr, int64_t size)
+{
+    TLLM_LOG_DEBUG ("[TensorRT-LLM][Datasystem] OnBoard copy, size=%lld.", size);
+    if (dst.getSizeInBytes() > 0) {
+        TLLM_LOG_DEBUG("[TensorRT_LLM][Datasystem] Print ptr address , src = %p , dst =%p.", srcAddr, dst.data());
+        TLLM_CUDA_CHECK(tensorrt_llm::common::cudaMemcpySanitized(dst.data(), srcAddr, size, cudaMemcpyHostToDevice ,Stream->get()));
+    }
+}
+
 
 void BufferManager::copy(IBuffer const& src, IBuffer& dst) const
 {

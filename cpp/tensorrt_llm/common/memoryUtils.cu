@@ -127,7 +127,7 @@ cudaError_t cudaMemcpySanitized(
 
     return result;
 #else
-    return cudaMemcpyAsync(dst, src, count, kind);
+    return cudaMemcpy(dst, src, count, kind);
 }
 
 template <typename T>

@@ -208,6 +208,9 @@ void KVCacheTransferManager::copyBlock(BlockPtr const& src, BlockPtr const& dst,
                 }
             }
         }
+
+        TLLM_LOG_DEBUG("copyBlock: DRAM mode complete. Returning...");
+        return;
     }
 
     for (size_t poolIdx = 0; poolIdx < pools.size(); ++poolIdx)
