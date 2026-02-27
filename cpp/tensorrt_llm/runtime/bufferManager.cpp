@@ -191,7 +191,7 @@ void BufferManager::onBoardCopy(IBuffer& dst, void* srcAddr, int64_t size)
     TLLM_LOG_DEBUG ("[TensorRT-LLM][Datasystem] OnBoard copy, size=%lld.", size);
     if (dst.getSizeInBytes() > 0) {
         TLLM_LOG_DEBUG("[TensorRT_LLM][Datasystem] Print ptr address , src = %p , dst =%p.", srcAddr, dst.data());
-        TLLM_CUDA_CHECK(tensorrt_llm::common::cudaMemcpySanitized(dst.data(), srcAddr, size, cudaMemcpyHostToDevice ,Stream->get()));
+        TLLM_CUDA_CHECK(tensorrt_llm::common::cudaMemcpySanitized(dst.data(), srcAddr, size, cudaMemcpyHostToDevice, mStream->get()));
     }
 }
 
