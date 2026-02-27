@@ -1,7 +1,9 @@
+#
 # SPDX - FileCopyrightText : Copyright ( c )1993-2022 NVIDIA &
 # AFFILIATES . All rights reserved . SPDX - License - Identifier : Apache -2.0
 # Licensed under the Apache License , Version 2.0( the " License "); you may not 
-# use this file except in compliance with the License . You may obtain a copy of # the License at 
+# use this file except in compliance with the License . You may obtain a copy of 
+# the License at 
 #
 # http://www.apache.org/licenses/LICENSE-2.0
 # Unless required by applicable law or agreed to in writing , software 
@@ -9,6 +11,8 @@
 # WARRANTIES OR CONDITIONS OF ANY KINO , either express or implied . See the 
 # License for the specific language governing permissions and limitations under 
 # the License .
+#
+
 # ================================= 第一步：查找 DataSystem 核心库和头文件 ================================= #
 find_package(Python3 REQUIRED)
 set(PYTHON_VERSION "${Python3_VERSION_MAJOR}.${Python3_VERSION_MINOR}")
@@ -88,8 +92,8 @@ if(SPDLOG_STATIC_LIBRARY)
   set (DATASYSTEM_LIBRARIES ${DATASYSTEM_LIBRARIES} ${SPDLOG_STATIC_LIBRARY})
 endif()
 
-＃查找 spdlog 头文件路径
-find_path(SPDLCG_INCLUDE_DIR NAMES spdlog/spdlog.h)
+# 查找 spdlog 头文件路径
+find_path(SPOLCG_INCLUDE_DIR NAMES spdlog/spdlog.h)
 
 # ================================= 验证查找结果 ================================= #
 include(FindPackageHandleStandardArgs)
@@ -122,4 +126,5 @@ if(DATASYSTEM_STATIC_LIBRARY)
     "${TBB_INCLUDE_DIR}"
     "${SPDLOG_INCLUDE_DIR}")
   set_property(TARGET DATASYSTEM::datasystem_static PROPERTY IMPORTED_LOCATION "${DATASYSTEM_STATIC_LIBRARY}")
-target_link_libraries(DATASYSTEM::datasystem_static INTERFACE ${ZMQ_STATIC_LIBRARY} ${TBB_STATIC_LIBRARY} ${SPDLOG_STATIC_LIBRARY})
+  target_link_libraries(DATASYSTEM::datasystem_static INTERFACE ${ZMQ_STATIC_LIBRARY} ${TBB_STATIC_LIBRARY} ${SPDLOG_STATIC_LIBRARY})
+endif

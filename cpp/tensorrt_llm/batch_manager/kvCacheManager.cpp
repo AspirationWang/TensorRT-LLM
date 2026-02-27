@@ -395,11 +395,12 @@ void KVCacheBlock::addNextBlock(BlockKey const& blockKey, BlockPtr block)
 bool checkKeyExist(const std::string& key)
 {
     KvCacheManagerDataSystem& dataSystem = KvCacheManagerDataSystem::getInstance();
-    if (!dataSystem.isKVClientInitialized()) {
+    if (!dataSystem.isKVClientInitialized())
+    {
 		TLLM_LOG_ERROR("[TensorRT-LLM ][Datasystem] KvCache Client is not initialized ");
 		return false;
 	}
-    std::shared_ptr <datasystem::KVClient> kvClient->dataSystem.getKVClient();
+    std::shared_ptr <datasystem::KVClient> kvClient = dataSystem.getKVClient();
     std::vector<std::string> keys = { key };
     std::vector<bool> exists;
     datasystem::Status existRet = kvClient->Exist(keys, exists);
@@ -415,6 +416,7 @@ std::tuple<bool, SizeType32, BlockPtr> KVCacheBlock::findMatchingBlock(
 {
     if (blockKey.uniqueTokens.size() == 0 || mNextBlocks.size() == 0)
     {
+        TLLM_LOG_DEBUG("[TensorRT-LLM][Datasystem] blockKey.uniqueTokens.size() = %d, mNextBlocks.size() = %d.", blockKey.uniqueTokens.size(), mNextBlocks.size());
         return {false, 0, nullptr};
     }
     auto itr = mNextBlocks.find(blockKey);
@@ -438,7 +440,8 @@ std::tuple<bool, SizeType32, BlockPtr> KVCacheBlock::findMatchingBlock(
             }
             if (bestNumMatched > 0)
             {
-                if (!bestBlock->isPrimary() && !checkKeyExist(std::to_string(BlockKeyHasher::hash(bestBlock->getBlockKey())))) {
+                if (!bestBlock->isPrimary() && !CheckKeyExist(std::to_string(BlockKeyHasher::hash(bestBlock->getBlockKey())))) {
+                    TLLM_LOG_INFO("[TensorRT-LLM][Datasystem] Exist Key = %s.", std::to_string(BlockKeyHasher::hash(block->getBlockKey())).c_str());
                     /* 如果kvcache已经被卸载到DRAM中，需要先检查在datasystem中还存不存在，如果不存在，需要重新计算 */
                     return {false, 0, nullptr};
                 }
@@ -448,8 +451,9 @@ std::tuple<bool, SizeType32, BlockPtr> KVCacheBlock::findMatchingBlock(
         return {false, 0, nullptr};
     }
     auto block = itr->second;
-    if (!block->isPrimary() && !checkKeyExist(std::to_string(BlockKeyHasher::hash(bestBlock->getBlockKey())))) {
+    if (!block->isPrimary() && !checkKeyExist(std::to_string(BlockKeyHasher::hash(block->getBlockKey())))) {
         /* 如果kvcache已经被卸载到DRAM中，需要先检查在datasystem中还存不存在，如果不存在，需要重新计算 */
+        TLLM_LOG_INFO("[TensorRT-LLM][Datasystem] Exist Key = %s.", std::to_string(BlockKeyHasher::hash(block->getBlockKey())).c_str());
         return {false, 0, nullptr};
     }
     return {!block->isFull(), static_cast<SizeType32>(blockKey.uniqueTokens.size()), block};
@@ -1733,9 +1737,9 @@ KvCacheManagerDataSystemTmp::KvCacheManagerDataSystemTmp()
     datasystem::ConnectOptions conn_opts;
     conn_opts.SetAkSkAuth("", "", "");
     // 核心：集群地址（优先从环境变量读取，便于部署）
-    conn_opts.host = std::getenv("DATASYSTEM_HOST") ? std::getenv("DATASYSTEM_HOST") : "127.0.0.1";
+    conn_opts.host = std::getenv("DATASYSTEM_HOST") ? std::getenv("DATASYSTEM_HOST") : "127.0.0.2";
     conn_opts.port = std::getenv("DATASYSTEM_PORT") ? std::stoi(std::getenv("DATASYSTEM_PORT")) : 31501;
-    TLLM_LOG_INFO("[TensorRT-LLM][Datasystem] Init KvCache Manager DataSystem. host = %s, ip = %u.", conn_opts.host.c_str(), conn_opts.port);
+    TLLM_LOG_INFO("[TensorRT-LLM][Datasystem] Init KvCache Manager DataSystem TMP. host = %s, ip = %u.", conn_opts.host.c_str(), conn_opts.port);
     // 超时配置
     conn_opts.connectTimeoutMs = 60000; // 保留默认60s
     conn_opts.requestTimeoutMs = 10000; // 单次请求10s超时

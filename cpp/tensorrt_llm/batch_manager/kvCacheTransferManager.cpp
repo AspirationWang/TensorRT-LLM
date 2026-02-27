@@ -116,7 +116,7 @@ void KVCacheTransferManager::copyBlock(BlockPtr const& src, BlockPtr const& dst,
     TLLM_LOG_DEBUG("copyBlock entered: srcId=%d, dstId=%d, isOffload=%s, mode=%d", src->getBlockId(), dst->getBlockId(),
         (isOffload ? "true" : "false"), static_cast<int>(mode));
 
-    if (mode == executor::KVCacheTransferMode::DRAM)
+    if (mode == executor::KvCacheTransferMode::DRAM)
     {
         TLLM_LOG_DEBUG("[TensorRT-LLM][Datasystem] mode = %d: pools.size() = %u, numTokensToCopy = %d.",
             pools.size(), numTokensToCopy);
@@ -141,7 +141,6 @@ void KVCacheTransferManager::copyBlock(BlockPtr const& src, BlockPtr const& dst,
                     TLLM_LOG_DEBUG("[TensorRT-LLM][Datasystem] srcPtr is not empty ptr, dstPtr is not empty ptr");
                 }
             }
-
             KvCacheManagerDataSystem& dataSystem = KvCacheManagerDataSystem::getInstance();
             if (!dataSystem.isKVClientInitialized())
             {
@@ -171,11 +170,11 @@ void KVCacheTransferManager::copyBlock(BlockPtr const& src, BlockPtr const& dst,
                     return;
                 }
             
-                mOffloadManager.offloadCopy(*srcPtr, buffer->MutableData());
+                mOffloadManager.offLoadCopy(*srcPtr, buffer->MutableData());
                 /* set的地址为buffer */
-                buffer->MLatch();
+                buffer->WLatch();
                 datasystem::Status setRet = kvClient->Set(buffer);
-                buffer->MUnlatch();
+                buffer->UnWLatch();
                 if (setRet.IsError()) {
                     TLLM_LOG_ERROR("[TensorRT-LLM][Datasystem] Set KvCache failed, detail : %s", setRet.ToString().c_str());
                     return;
@@ -201,7 +200,7 @@ void KVCacheTransferManager::copyBlock(BlockPtr const& src, BlockPtr const& dst,
                     TLLM_LOG_DEBUG("[TensorRT-LLM][Datasystem] Get KvCache Success");
                     buffer->RLatch();
                     mOnboardManager.onBoardCopy(*dstPtr, buffer->MutableData(), buffer->GetSize());
-                    buffer->RUnlatch();
+                    buffer->UnRLatch();
                     // clock_gettime(CLOCK_MONOTONIC, &end);
                     // long long duration_ns = (end.tv_sec - start.tv_sec) * 1e9 + (end.tv_nsec - start.tv_nsec);
                     // double duration_ms = duration_ns / 1e6;

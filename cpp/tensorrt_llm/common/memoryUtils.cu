@@ -87,7 +87,7 @@ cudaError_t cudaMemcpyAsyncSanitized(
 }
 
 cudaError_t cudaMemcpySanitized(
-    void* dst, void const* src, size_t count, enum cudaMemcpyKind kind, cudaStream_t stream = nullptr)
+    void* dst, void const* src, size_t count, enum cudaMemcpyKind kind, cudaStream_t stream)
 {
     #if defined(TLLM_HAS_ASAN)
     bool needASAN = false;
