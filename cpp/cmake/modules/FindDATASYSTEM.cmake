@@ -16,7 +16,7 @@
 # ================================= 第一步：查找 DataSystem 核心库和头文件 ================================= #
 find_package(Python3 REQUIRED)
 set(PYTHON_VERSION "${Python3_VERSION_MAJOR}.${Python3_VERSION_MINOR}")
-set(DATASYSTEM_BASE_PATH "/usr/local/lib/python${PYTHON_VERSION}/dist-packages/yr/datasystem")
+set(DATASYSTEM_BASE_PATH "/usr/local/lib/python${PYTHON_VERSION}/site-packages/yr/datasystem")
 set(DATASYSTEM_INCLUDE_BASE "${DATASYSTEM_BASE_PATH}/include")
 set(DATASYSTEM_LIB_BASE "${DATASYSTEM_BASE_PATH}/lib")
 
