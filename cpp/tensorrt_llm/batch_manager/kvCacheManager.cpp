@@ -2241,6 +2241,7 @@ std::map<SizeType32, std::vector<SizeType32>> BaseKVCacheManager::groupLayersByW
     return uniqueWindowSizeToLayers;
 }
 
+/* Test */
 std::tuple<uint64_t, uint64_t> BaseKVCacheManager::calculateFreeMemBytes(
     runtime::BufferManager const& bufferManager, executor::KvCacheConfig const& config)
 {
