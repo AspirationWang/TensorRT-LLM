@@ -441,7 +441,7 @@ std::tuple<bool, SizeType32, BlockPtr> KVCacheBlock::findMatchingBlock(
             if (bestNumMatched > 0)
             {
                 if (!bestBlock->isPrimary() && !checkKeyExist(std::to_string(BlockKeyHasher::hash(bestBlock->getBlockKey())))) {
-                    TLLM_LOG_INFO("[TensorRT-LLM][Datasystem] Exist Key = %s.", std::to_string(BlockKeyHasher::hash(block->getBlockKey())).c_str());
+                    TLLM_LOG_INFO("[TensorRT-LLM][Datasystem] Exist Key = %s.", std::to_string(BlockKeyHasher::hash(bestBlock->getBlockKey())).c_str());
                     /* 如果kvcache已经被卸载到DRAM中，需要先检查在datasystem中还存不存在，如果不存在，需要重新计算 */
                     return {false, 0, nullptr};
                 }
