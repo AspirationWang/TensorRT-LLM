@@ -89,7 +89,7 @@ cudaError_t cudaMemcpyAsyncSanitized(
 cudaError_t cudaMemcpySanitized(
     void* dst, void const* src, size_t count, enum cudaMemcpyKind kind, cudaStream_t stream)
 {
-    #if defined(TLLM_HAS_ASAN)
+#if defined(TLLM_HAS_ASAN)
     bool needASAN = false;
     if (kind == cudaMemcpyDeviceToHost)
     {
@@ -128,6 +128,7 @@ cudaError_t cudaMemcpySanitized(
     return result;
 #else
     return cudaMemcpy(dst, src, count, kind);
+#endif
 }
 
 template <typename T>
